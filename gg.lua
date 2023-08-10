@@ -23,5 +23,15 @@ end
 function redraw()
   screen.clear()
   viewwave:redraw()
+
+
+  screen.blend_mode(0)
+
+  screen.level(10)
+  screen.line_width(0.9)
+  screen.move(5,0)
+  screen.line_rel(10,24)
+  screen.line_rel(20,-10)
+  screen.stroke()
   screen.update()
 end

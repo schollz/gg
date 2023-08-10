@@ -79,14 +79,26 @@ function ViewWave:sel_cursor(ci)
 end
 
 function ViewWave:zoom(zoom_in)
-  local zoom_amount=1.4
+  local zoom_amount=1.25
   local view_duration=(self.view[2]-self.view[1])
   local view_duration_new=zoom_in and view_duration/zoom_amount or view_duration*zoom_amount
   local cursors=self.cursors
   local cursor_center=(cursors[1]+cursors[2])/2
   local view_new={0,0}
-  view_new[1]=util.clamp(cursor_center-view_duration_new/2,0,self.duration)
-  view_new[2]=util.clamp(cursor_center+view_duration_new/2,0,self.duration)
+  for i=1,2 do
+    local x=cursor_center-self.view[i]
+    x = x * (zoom_in and 1/zoom_amount or zoom_amount)
+    print(i,cursor_center,x)
+    view_new[i]=util.clamp(cursor_center-x,0,self.duration)
+  end
+  if zoom_in and self.cursors[2]>view_new[2] then 
+    view_new[2]=self.cursors[2]
+  end
+  if zoom_in and self.cursors[1]<view_new[1] then 
+    view_new[1]=self.cursors[1]
+  end
+  tab.print(view_new)
+  -- view_new[2]=util.clamp(cursor_center+view_duration_new/2,0,self.duration)
   if (view_new[2]-view_new[1])<0.005 then
     do return end
   end
@@ -95,7 +107,14 @@ function ViewWave:zoom(zoom_in)
 end
 
 function ViewWave:render()
-  os.execute(string.format("audiowaveform -q -i %s -o /dev/shm/%s.png -s %2.4f -e %2.4f -w %2.0f -h %2.0f --background-color 000000 --waveform-color 555555 --no-axis-labels --compression 0",self.dat_path,self.waveform_file,self.view[1],self.view[2],self.width,self.height))
+  local rendered=string.format("/home/we/dust/data/gg/%s_%2.4f_%2.4f_%2.0f_%2.0f.png",self.filename,self.view[1],self.view[2],self.width,self.height)
+  if not util.file_exists(rendered) then 
+    print("[viewwave] rendering",rendered)
+    os.execute(string.format("audiowaveform -q -i %s -o %s -s %2.4f -e %2.4f -w %2.0f -h %2.0f --background-color 000000 --waveform-color 555555 --no-axis-labels --compression 0",self.dat_path,rendered,self.view[1],self.view[2],self.width,self.height))
+  else
+    print("[viewwave] resusing render: ",rendered)
+  end
+  self.rendered = rendered
 end
 
 function ViewWave:redraw(x,y,show_cursor)
@@ -103,8 +122,8 @@ function ViewWave:redraw(x,y,show_cursor)
   if show_cursor==nil then
     show_cursor=true
   end
-  if self.waveform_file==nil or not util.file_exists("/dev/shm/"..self.waveform_file..".png") then
-    do return "NOTHING LOADED" end
+  if self.rendered==nil then 
+    do return end 
   end
   if self.debounce_zoom~=0 then
     if self.debounce_zoom<0 then
@@ -121,9 +140,10 @@ function ViewWave:redraw(x,y,show_cursor)
   end
   local x=1
   local y=22
-  screen.display_png("/dev/shm/"..self.waveform_file..".png",x,y)
-  screen.rect(1,26,127,38)
+  screen.display_png(self.rendered,x,y)
   screen.level(15)
+  screen.line_width(1)
+  screen.rect(1,26,127,38)
   screen.stroke()
   screen.update()
   if show_cursor then
@@ -147,8 +167,12 @@ function ViewWave:redraw(x,y,show_cursor)
   screen.rect(v1,27,v2-v1,62-27)
   screen.fill()
 
-  screen.move(5,5)
-  screen.text(string.format("%2.3f [%2.3f]",self.cursors[1],self.cursors[2]-self.cursors[1]))
+  -- screen.move(5,5)
+  -- screen.text(string.format("%2.3f [%2.3f]",self.cursors[1],self.cursors[2]-self.cursors[1]))
+  screen.blend_mode(2)
+  screen.level(10)
+  screen.move(2,62)
+  screen.text(string.format("%2.1fx",self.duration/(self.view[2]-self.view[1])))
 end
 
 return ViewWave
